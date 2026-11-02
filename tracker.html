@@ -36,6 +36,8 @@ h1{font-size:20px;margin:0;letter-spacing:-.3px}
 .row:last-child{border:0;padding-bottom:0}.row:first-child{padding-top:0}
 .row .t{min-width:0;flex:1}.row .t div{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .row small{color:var(--mu)}
+.th{width:46px;height:62px;border-radius:10px;object-fit:cover;background:var(--card2);flex:none}
+.th.big{width:64px;height:86px}
 .rank{width:26px;height:26px;border-radius:8px;background:var(--card2);color:var(--mu);font-size:12px;font-weight:700;display:flex;align-items:center;justify-content:center;flex:none}
 .rank.g{background:var(--ac);color:#fff}
 .vbar{height:4px;border-radius:3px;background:linear-gradient(90deg,var(--ac2),var(--ac));margin-top:5px}
@@ -68,6 +70,7 @@ var eur=function(n){return n.toLocaleString('de-DE',{style:'currency',currency:'
 var num=function(n){return Math.round(n).toLocaleString('de-DE')};
 var cmp=function(n){n=+n||0;if(n>=1e6)return (n/1e6).toFixed(n>=1e7?1:2).replace('.',',')+'M';if(n>=1e4)return (n/1e3).toFixed(1).replace('.',',')+'K';return num(n)};
 var today=function(){return new Date().toISOString().slice(0,10)};
+function img(u,c){return u?'<img class="th '+(c||'')+'" src="'+esc(u)+'" referrerpolicy="no-referrer" loading="lazy" onerror="this.style.display=\'none\'">':''}
 function esc(s){var d=document.createElement('div');d.textContent=s==null?'':s;return d.innerHTML}
 function ms(c){c=+c||0;return c<1e12?c*1000:c}
 function ls(k,d){try{var v=localStorage.getItem(k);return v==null?d:JSON.parse(v)}catch(e){return d}}
@@ -127,7 +130,7 @@ function stats(){
 }
 function bestVideoHTML(S){
   var h='<div class="card"><div class="k">🏆 Bestes Video der Woche</div>';
-  if(S.week.length){var b=S.week[0];h+='<div class="v" style="margin:6px 0 2px">'+num(b.views)+' Views</div><div style="margin-bottom:4px">'+esc(b.title||'(ohne Titel)')+'</div><div class="sub">'+num(b.likes)+' Likes · '+new Date(ms(b.created)).toLocaleDateString('de-DE')+' · '+S.week.length+' Videos in 7 Tagen</div>'}
+  if(S.week.length){var b=S.week[0];h+='<div style="display:flex;gap:12px;margin-top:8px">'+img(b.cover,'big')+'<div style="min-width:0"><div class="v">'+num(b.views)+' Views</div><div style="margin:2px 0 4px">'+esc(b.title||'(ohne Titel)')+'</div><div class="sub">'+num(b.likes)+' Likes · '+new Date(ms(b.created)).toLocaleDateString('de-DE')+' · '+S.week.length+' Videos in 7 Tagen</div></div></div>'}
   else h+='<div class="empty">Diese Woche noch kein Video gepostet.</div>';
   return h+'</div>';
 }
@@ -161,7 +164,7 @@ function render(){
     if(sort==='top')L.sort(function(a,b){return b.views-a.views});else L.sort(function(a,b){return ms(b.created)-ms(a.created)});
     L=L.slice(0,30);var mx=Math.max.apply(null,L.map(function(v){return v.views}).concat([1]));
     h+='<div class="pills"><button class="'+(sort==='top'?'on':'')+'" onclick="sort=\'top\';render()">🔥 Top</button><button class="'+(sort==='new'?'on':'')+'" onclick="sort=\'new\';render()">🕒 Neueste</button></div>'+
-      '<div class="card">'+(L.length?L.map(function(v,i){return '<div class="row"><div class="rank '+(i<3&&sort==='top'?'g':'')+'">'+(i+1)+'</div><div class="t"><div>'+esc(v.title||'(ohne Titel)')+'</div><small>'+num(v.likes)+' Likes'+(v.created?' · '+new Date(ms(v.created)).toLocaleDateString('de-DE'):'')+'</small><div class="vbar" style="width:'+Math.max(3,v.views/mx*100)+'%"></div></div><b>'+cmp(v.views)+'</b></div>'}).join(''):'<div class="empty">'+(liveErr?esc(liveErr):'Lädt…')+'</div>')+'</div>';
+      '<div class="card">'+(L.length?L.map(function(v,i){return '<div class="row"><div class="rank '+(i<3&&sort==='top'?'g':'')+'">'+(i+1)+'</div>'+img(v.cover)+'<div class="t"><div>'+esc(v.title||'(ohne Titel)')+'</div><small>'+num(v.likes)+' Likes'+(v.created?' · '+new Date(ms(v.created)).toLocaleDateString('de-DE'):'')+'</small><div class="vbar" style="width:'+Math.max(3,v.views/mx*100)+'%"></div></div><b>'+cmp(v.views)+'</b></div>'}).join(''):'<div class="empty">'+(liveErr?esc(liveErr):'Lädt…')+'</div>')+'</div>';
   }
   if(tab==='ins'){
     var DN=['So','Mo','Di','Mi','Do','Fr','Sa'],ord=[1,2,3,4,5,6,0],avg=ord.map(function(w){return {l:DN[w],v:S.dc[w]?S.dv[w]/S.dc[w]:0,n:S.dc[w],t:S.dc[w]?cmp(S.dv[w]/S.dc[w]):''}}),
