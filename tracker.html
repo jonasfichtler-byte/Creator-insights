@@ -105,6 +105,25 @@ function line(p){
   pts=p.map(function(v,i){return (10+i*280/(p.length-1)).toFixed(1)+','+(100-(v-mn)/r*85).toFixed(1)}).join(' ');
   return '<svg viewBox="0 0 300 110"><polyline points="'+pts+'" fill="none" stroke="#fe2c55" stroke-width="2.5" stroke-linejoin="round"/></svg>';
 }
+function ms(c){c=+c||0;return c<1e12?c*1000:c}
+function insights(){
+  if(!live||!live.list||!live.list.length)return '';
+  var L=live.list.filter(function(v){return v.created}),H='';
+  var wk=Date.now()-7*864e5,week=L.filter(function(v){return ms(v.created)>=wk}).sort(function(a,b){return b.views-a.views});
+  H+='<div class="card"><div class="k">Bestes Video der Woche</div>';
+  if(week.length){var b=week[0];H+='<div class="v">'+num(b.views)+' Views</div><div>'+esc(b.title||'(ohne Titel)')+'</div><div class="k">'+num(b.likes)+' Likes · '+new Date(ms(b.created)).toLocaleDateString('de-DE')+' · '+week.length+' Videos diese Woche</div>'}
+  else H+='<p class="note">Diese Woche noch kein Video gepostet.</p>';
+  H+='</div>';
+  var D=['So','Mo','Di','Mi','Do','Fr','Sa'],dv=[0,0,0,0,0,0,0],dc=[0,0,0,0,0,0,0],hv={},hc={};
+  L.forEach(function(v){var d=new Date(ms(v.created)),w=d.getDay(),h=d.getHours();dv[w]+=v.views;dc[w]++;hv[h]=(hv[h]||0)+v.views;hc[h]=(hc[h]||0)+1});
+  var order=[1,2,3,4,5,6,0],avg=order.map(function(w){return {l:D[w],v:dc[w]?dv[w]/dc[w]:0,n:dc[w]}});
+  var best=avg.slice().sort(function(a,b){return b.v-a.v})[0];
+  H+='<div class="card"><div class="k">Ø Views pro Video nach Wochentag</div>'+bars(avg)+
+     (best&&best.v?'<p class="note">Beste Posting-Tage: <b>'+avg.slice().filter(function(x){return x.n>=2}).sort(function(a,b){return b.v-a.v}).slice(0,2).map(function(x){return x.l}).join(' & ')+'</b> (nur Tage mit mind. 2 Videos gezählt)</p>':'')+'</div>';
+  var hs=Object.keys(hc).filter(function(h){return hc[h]>=2}).map(function(h){return {h:+h,v:hv[h]/hc[h],n:hc[h]}}).sort(function(a,b){return b.v-a.v}).slice(0,3);
+  if(hs.length)H+='<div class="card"><div class="k">Beste Uhrzeiten (Ø Views)</div>'+hs.map(function(x){return '<div class="row"><div>'+x.h+':00–'+x.h+':59 Uhr<br><small>'+x.n+' Videos</small></div><b>'+num(x.v)+'</b></div>'}).join('')+'</div>';
+  return H;
+}
 function render(){
   var T=[['home','Übersicht'],['inc','Einnahmen'],['reach','Reichweite']];
   document.getElementById('tabs').innerHTML=T.map(function(t){return '<button class="'+(tab===t[0]?'on':'')+'" onclick="tab=\''+t[0]+'\';render()">'+t[1]+'</button>'}).join('');
@@ -137,7 +156,7 @@ function render(){
   }
   if(tab==='reach'){
     var L=live?live.list.slice().sort(function(a,b){return b.views-a.views}).slice(0,15):[];
-    h+='<div class="card"><div class="k">Follower-Verlauf</div>'+line(hist.map(function(x){return x.follower}))+'</div>'+
+    h+=insights()+'<div class="card"><div class="k">Follower-Verlauf</div>'+line(hist.map(function(x){return x.follower}))+'</div>'+
        '<div class="card"><div class="k">Views-Verlauf</div>'+line(hist.map(function(x){return x.views}))+'</div>'+
        '<div class="card"><div class="k">Top-Videos nach Views</div>'+(L.length?L.map(function(v){return '<div class="row"><div>'+esc(v.title||'(ohne Titel)')+'<br><small>'+num(v.likes)+' Likes</small></div><b>'+num(v.views)+'</b></div>'}).join(''):'<p class="note">'+(liveErr?esc(liveErr):'Lädt…')+'</p>')+'</div>';
   }
