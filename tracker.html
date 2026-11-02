@@ -3,6 +3,11 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="theme-color" content="#0b0b10">
+<meta name="apple-mobile-web-app-title" content="Tracker">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
+<link rel="icon" href="icon-192.png">
+<link rel="manifest" href="manifest.json">
 <title>Creator Tracker</title>
 <style>
 :root{--bg:#f4f4f8;--card:#fff;--card2:#eeeef4;--tx:#14141a;--mu:#6e6e7c;--bd:#e4e4ec;--ac:#fe2c55;--ac2:#20d5ec;--ok:#12a36b;--glow:rgba(254,44,85,.14)}
@@ -67,10 +72,16 @@ nav button.on{color:var(--ac)}nav button.on span{filter:none;opacity:1}
 .cmpbar{height:8px;background:var(--card2);border-radius:6px;position:relative;margin:8px 0 4px}
 .cmpbar i{position:absolute;top:-3px;width:3px;height:14px;background:var(--tx);border-radius:2px}
 .cmpbar u{position:absolute;left:0;top:0;bottom:0;border-radius:6px;background:linear-gradient(90deg,var(--ac2),var(--ac));text-decoration:none}
+.idea{padding:12px 0;border-bottom:1px solid var(--bd)}.idea:last-child{border:0;padding-bottom:0}.idea:first-child{padding-top:0}
+.idea .acts{display:flex;gap:8px;margin-top:8px}
+.idea .acts button{flex:1;padding:8px;border:1px solid var(--bd);background:var(--card2);color:var(--tx);border-radius:10px;font:inherit;font-size:13px;font-weight:600}
+.idea .acts button.go{background:var(--ac);border-color:var(--ac);color:#fff}
+textarea{width:100%;padding:12px;border:1px solid var(--bd);border-radius:12px;background:var(--bg);color:var(--tx);font:inherit;margin-top:5px;resize:vertical;min-height:64px}
+nav button{font-size:10.5px}
 </style></head><body><main>
 <header><h1>📈 Creator Tracker</h1><div class="live" id="live" onclick="loadLive()"><i class="dot" id="dot"></i><span id="lt">lädt…</span></div></header>
 <div id="app" class="fade"></div>
-<p id="foot">Einnahmen & Ziele werden nur in diesem Browser gespeichert.</p>
+<p id="foot">Einnahmen, Ziele und Ideen werden nur in diesem Browser gespeichert.</p>
 </main>
 <nav><div id="nav"></div></nav>
 <script>
@@ -198,8 +209,23 @@ function rangeCard(){
   }
   return h+'</div>';
 }
+var ideas=ls('ct_ideas',[]),istat='idea',ST=[['idea','💡','Ideen'],['shot','🎬','Gedreht'],['posted','✅','Gepostet']];
+function saveIdeas(){lsSet('ct_ideas',ideas)}
+function addIdea(){var t=document.getElementById('it').value.trim();if(!t)return;ideas.unshift({id:'i'+Date.now(),t:t,n:document.getElementById('in').value.trim(),s:'idea',d:Date.now()});saveIdeas();istat='idea';render()}
+function moveIdea(id,s){ideas.forEach(function(i){if(i.id===id)i.s=s});saveIdeas();render()}
+function delIdea(id){if(!confirm('Löschen?'))return;ideas=ideas.filter(function(i){return i.id!==id});saveIdeas();render()}
+function ideasHTML(){
+  var h='<div class="card"><div class="k">Neue Idee</div><label>Titel / Hook</label><input id="it" placeholder="z. B. Was wäre wenn Monster 1 Woche nur Wasser…"><label>Notiz (optional)</label><textarea id="in" placeholder="Ablauf, Hashtags, Sound…"></textarea><button class="btn" onclick="addIdea()">+ Idee speichern</button></div>';
+  h+='<div class="pills">'+ST.map(function(x){var n=ideas.filter(function(i){return i.s===x[0]}).length;return '<button class="'+(istat===x[0]?'on':'')+'" onclick="istat=\''+x[0]+'\';render()">'+x[1]+' '+x[2]+' '+n+'</button>'}).join('')+'</div>';
+  var L=ideas.filter(function(i){return i.s===istat});
+  h+='<div class="card">'+(L.length?L.map(function(i){
+    var nx=istat==='idea'?['shot','🎬 Gedreht']:istat==='shot'?['posted','✅ Gepostet']:null,pv=istat==='posted'?['shot','↩︎ Zurück']:istat==='shot'?['idea','↩︎ Idee']:null;
+    return '<div class="idea"><div style="font-weight:600">'+esc(i.t)+'</div>'+(i.n?'<div class="sub" style="white-space:pre-wrap;margin-top:2px">'+esc(i.n)+'</div>':'')+
+      '<div class="sub" style="margin-top:4px">'+new Date(i.d).toLocaleDateString('de-DE')+'</div><div class="acts">'+(nx?'<button class="go" onclick="moveIdea(\''+i.id+'\',\''+nx[0]+'\')">'+nx[1]+'</button>':'')+(pv?'<button onclick="moveIdea(\''+i.id+'\',\''+pv[0]+'\')">'+pv[1]+'</button>':'')+'<button style="flex:0 0 44px" onclick="delIdea(\''+i.id+'\')">🗑</button></div></div>'}).join(''):'<div class="empty">'+(istat==='idea'?'Noch keine Ideen. Schreib die erste auf!':'Hier ist noch nichts.')+'</div>')+'</div>';
+  return h;
+}
 function render(){
-  var N=[['home','🏠','Start'],['vid','🎬','Videos'],['ins','💡','Insights'],['inc','💶','Geld']];
+  var N=[['home','🏠','Start'],['vid','🎬','Videos'],['ins','📊','Insights'],['idea','💡','Ideen'],['inc','💶','Geld']];
   document.getElementById('nav').innerHTML=N.map(function(t){return '<button class="'+(tab===t[0]?'on':'')+'" onclick="go(\''+t[0]+'\')"><span>'+t[1]+'</span>'+t[2]+'</button>'}).join('');
   document.getElementById('dot').className='dot'+(live?' on':'');
   document.getElementById('lt').textContent=live?'Live · '+new Date(live.t).toLocaleTimeString('de-DE',{hour:'2-digit',minute:'2-digit'}):(liveErr?'Fehler – tippen':'lädt…');
@@ -234,6 +260,7 @@ function render(){
       '<div class="sec">Verlauf</div><div class="card"><div class="k">Follower</div><div style="margin-top:6px">'+spark(hist.filter(function(x){return x.t>=cutoff()}).map(function(x){return x.follower}),80)+'</div></div>'+
       '<div class="card"><div class="k">Views gesamt</div><div style="margin-top:6px">'+spark(hist.filter(function(x){return x.t>=cutoff()}).map(function(x){return x.views}),80)+'</div></div>';
   }
+  if(tab==='idea')h+=ideasHTML();
   if(tab==='inc'){
     var tp=ls('ct_tax',0),months=[];
     for(var k=5;k>=0;k--){var d=new Date(D.now.getFullYear(),D.now.getMonth()-k,1),key=d.toISOString().slice(0,7),v=D.inc.filter(function(i){return i.date.slice(0,7)===key}).reduce(function(s,i){return s+i.amt},0);months.push({l:d.toLocaleDateString('de-DE',{month:'short'}),v:v,t:v?Math.round(v):''})}
