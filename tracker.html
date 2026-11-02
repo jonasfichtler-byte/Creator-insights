@@ -74,7 +74,7 @@ nav button.on{color:var(--ac)}nav button.on span{filter:none;opacity:1}
 </main>
 <nav><div id="nav"></div></nav>
 <script>
-var API='https://creator-tracker-api.jonas-fichtler.workers.dev',tab='home',live=null,hist=[],liveErr='',items=[],sort='top',showForm=false,LS='ct_items';
+var API='https://creator-tracker-api.jonas-fichtler.workers.dev',tab='home',live=null,hist=[],liveErr='',items=[],sort='top',range=ls('ct_range',7),showForm=false,LS='ct_items';
 var eur=function(n){return n.toLocaleString('de-DE',{style:'currency',currency:'EUR'})};
 var num=function(n){return Math.round(n).toLocaleString('de-DE')};
 var cmp=function(n){n=+n||0;if(n>=1e6)return (n/1e6).toFixed(n>=1e7?1:2).replace('.',',')+'M';if(n>=1e4)return (n/1e3).toFixed(1).replace('.',',')+'K';return num(n)};
@@ -131,8 +131,8 @@ function goalHTML(){
 }
 
 function stats(){
-  var L=(live&&live.list||[]).filter(function(v){return v.created}),wk=Date.now()-7*864e5,
-  week=L.filter(function(v){return ms(v.created)>=wk}).sort(function(a,b){return b.views-a.views}),
+  var A=(live&&live.list||[]).filter(function(v){return v.created}),L=A.filter(inR),wk=Date.now()-7*864e5,
+  week=A.filter(function(v){return ms(v.created)>=wk}).sort(function(a,b){return b.views-a.views}),
   dv=[0,0,0,0,0,0,0],dc=[0,0,0,0,0,0,0],hv={},hc={};
   L.forEach(function(v){var d=new Date(ms(v.created));dv[d.getDay()]+=v.views;dc[d.getDay()]++;hv[d.getHours()]=(hv[d.getHours()]||0)+v.views;hc[d.getHours()]=(hc[d.getHours()]||0)+1});
   return {L:L,week:week,dv:dv,dc:dc,hv:hv,hc:hc};
@@ -179,6 +179,25 @@ function heatmap(S){
       else{var q=mx?Math.min(1,c.a/mx):0,al=c.n>=2?(.25+.75*q):.12;h+='<b style="background:rgba(254,44,85,'+al.toFixed(2)+');'+(c.n<2?'color:var(--mu)':'')+'">'+cmp(c.a)+'</b>'}}});
   return h+'</div><div class="sub" style="margin-top:10px">Ø Views pro Video. Dunkler = besser. Blasse Felder: nur 1 Video, wenig Aussagekraft. Uhrzeiten in Blöcken von 4 Stunden.</div>';
 }
+function setRange(d){range=d;lsSet('ct_range',d);render()}
+function cutoff(){return range?Date.now()-range*864e5:0}
+function inR(v){return !range||ms(v.created)>=cutoff()}
+function pillsHTML(){return '<div class="pills">'+[[1,'24 Std.'],[7,'7 Tage'],[30,'30 Tage'],[0,'Alles']].map(function(r){return '<button class="'+(range===r[0]?'on':'')+'" onclick="setRange('+r[0]+')">'+r[1]+'</button>'}).join('')+'</div>'}
+function rangeCard(){
+  if(!live)return '';
+  var R=live.list.filter(inR),vw=R.reduce(function(s,v){return s+v.views},0),lk=R.reduce(function(s,v){return s+v.likes},0),
+      H=hist.filter(function(x){return x.t>=cutoff()}),h='<div class="card"><div class="k">📊 '+(range?'Letzte '+(range===1?'24 Stunden':range+' Tage'):'Gesamt')+'</div>';
+  h+='<div class="grid2" style="margin:10px 0 0"><div><div class="v">'+num(R.length)+'</div><div class="sub">Neue Videos</div></div><div><div class="v">'+cmp(vw)+'</div><div class="sub">Views dieser Videos</div></div>'+
+     '<div><div class="v">'+cmp(lk)+'</div><div class="sub">Likes dieser Videos</div></div><div><div class="v">'+(R.length?cmp(vw/R.length):'–')+'</div><div class="sub">Ø Views pro Video</div></div></div>';
+  if(range){
+    if(H.length>=2){var a=H[0],b=H[H.length-1],fg=b.follower-a.follower,vg=b.views-a.views,short=a.t>cutoff()+36e5*2;
+      h+='<div class="row" style="margin-top:12px"><div class="t"><div>Follower-Zuwachs</div></div><b class="'+(fg<0?'neg':'pos')+'" style="color:'+(fg<0?'var(--ac)':'var(--ok)')+'">'+(fg>=0?'+':'')+num(fg)+'</b></div>'+
+         '<div class="row"><div class="t"><div>Views gesamt dazu (alle Videos)</div></div><b>+'+num(vg)+'</b></div>'+
+         (short?'<div class="sub" style="margin-top:8px">Verlauf wird erst seit '+new Date(a.t).toLocaleString('de-DE',{day:'numeric',month:'numeric',hour:'2-digit',minute:'2-digit'})+' gespeichert, der Zeitraum ist daher kürzer.</div>':'')}
+    else h+='<div class="sub" style="margin-top:10px">Follower-Zuwachs folgt, sobald genug Messungen da sind.</div>';
+  }
+  return h+'</div>';
+}
 function render(){
   var N=[['home','🏠','Start'],['vid','🎬','Videos'],['ins','💡','Insights'],['inc','💶','Geld']];
   document.getElementById('nav').innerHTML=N.map(function(t){return '<button class="'+(tab===t[0]?'on':'')+'" onclick="go(\''+t[0]+'\')"><span>'+t[1]+'</span>'+t[2]+'</button>'}).join('');
@@ -194,26 +213,26 @@ function render(){
       '<div class="grid3"><div class="card"><div class="k">Views</div><div class="v">'+(live?cmp(live.views):'–')+'</div></div>'+
       '<div class="card"><div class="k">Likes</div><div class="v">'+(live?cmp(live.likes):'–')+'</div></div>'+
       '<div class="card"><div class="k">Videos</div><div class="v">'+(live?num(live.videos):'–')+'</div></div></div>'+
-      goalHTML()+
+      pillsHTML()+rangeCard()+goalHTML()+
       '<div class="grid2"><div class="card"><div class="k">Dieser Monat</div><div class="v">'+eur(D.month)+'</div></div>'+
       '<div class="card"><div class="k">Gesamt</div><div class="v">'+eur(D.tot)+'</div></div></div>'+bestVideoHTML(S);
   }
   if(tab==='vid'){
-    var L=live?live.list.slice():[];
+    var L=live?live.list.filter(inR):[];
     if(sort==='top')L.sort(function(a,b){return b.views-a.views});else L.sort(function(a,b){return ms(b.created)-ms(a.created)});
-    L=L.slice(0,30);var mx=Math.max.apply(null,L.map(function(v){return v.views}).concat([1]));
-    h+='<div class="pills"><button class="'+(sort==='top'?'on':'')+'" onclick="sort=\'top\';render()">🔥 Top</button><button class="'+(sort==='new'?'on':'')+'" onclick="sort=\'new\';render()">🕒 Neueste</button></div>'+
-      '<div class="sub" style="margin:0 4px 8px">Tippe ein Video für den Check.</div><div class="card">'+(L.length?L.map(function(v,i){return '<div class="row" style="cursor:pointer" onclick="openV(\''+v.id+'\')"><div class="rank '+(i<3&&sort==='top'?'g':'')+'">'+(i+1)+'</div>'+img(v.cover)+'<div class="t"><div>'+esc(v.title||'(ohne Titel)')+'</div><small>'+num(v.likes)+' Likes'+(v.created?' · '+new Date(ms(v.created)).toLocaleDateString('de-DE'):'')+'</small><div class="vbar" style="width:'+Math.max(3,v.views/mx*100)+'%"></div></div><b>'+cmp(v.views)+'</b></div>'}).join(''):'<div class="empty">'+(liveErr?esc(liveErr):'Lädt…')+'</div>')+'</div>';
+    L=L.slice(0,60);var mx=Math.max.apply(null,L.map(function(v){return v.views}).concat([1]));
+    h+=pillsHTML()+'<div class="pills"><button class="'+(sort==='top'?'on':'')+'" onclick="sort=\'top\';render()">🔥 Top</button><button class="'+(sort==='new'?'on':'')+'" onclick="sort=\'new\';render()">🕒 Neueste</button></div>'+
+      '<div class="sub" style="margin:0 4px 8px">'+L.length+' Videos · tippe eins für den Check.</div><div class="card">'+(L.length?L.map(function(v,i){return '<div class="row" style="cursor:pointer" onclick="openV(\''+v.id+'\')"><div class="rank '+(i<3&&sort==='top'?'g':'')+'">'+(i+1)+'</div>'+img(v.cover)+'<div class="t"><div>'+esc(v.title||'(ohne Titel)')+'</div><small>'+num(v.likes)+' Likes'+(v.created?' · '+new Date(ms(v.created)).toLocaleDateString('de-DE'):'')+'</small><div class="vbar" style="width:'+Math.max(3,v.views/mx*100)+'%"></div></div><b>'+cmp(v.views)+'</b></div>'}).join(''):'<div class="empty">'+(liveErr?esc(liveErr):'Lädt…')+'</div>')+'</div>';
   }
   if(tab==='ins'){
     var DN=['So','Mo','Di','Mi','Do','Fr','Sa'],ord=[1,2,3,4,5,6,0],avg=ord.map(function(w){return {l:DN[w],v:S.dc[w]?S.dv[w]/S.dc[w]:0,n:S.dc[w],t:S.dc[w]?cmp(S.dv[w]/S.dc[w]):''}}),
         bi=-1,bv=0;avg.forEach(function(x,i){if(x.n>=2&&x.v>bv){bv=x.v;bi=i}});
     var hs=Object.keys(S.hc).filter(function(k){return S.hc[k]>=2}).map(function(k){return {h:+k,v:S.hv[k]/S.hc[k],n:S.hc[k]}}).sort(function(a,b){return b.v-a.v}).slice(0,3);
-    h+='<div class="sec">Wann posten?</div><div class="card"><div class="k">Ø Views pro Video je Wochentag</div><div style="margin-top:8px">'+bars(avg,bi<0?null:bi)+'</div>'+
+    h+=pillsHTML()+'<div class="sec">Wann posten?</div><div class="card"><div class="k">Ø Views pro Video je Wochentag</div><div style="margin-top:8px">'+bars(avg,bi<0?null:bi)+'</div>'+
       (bi>=0?'<div class="sub">Bester Tag: <b style="color:var(--tx)">'+avg[bi].l+'</b> (nur Tage mit mind. 2 Videos)</div>':'')+'</div>'+
       '<div class="card"><div class="k">🗓️ Heatmap: Wochentag × Uhrzeit</div><div style="margin-top:10px">'+heatmap(S)+'</div></div><div class="card"><div class="k">Beste Uhrzeiten</div>'+(hs.length?hs.map(function(x,i){return '<div class="row"><div class="rank '+(i===0?'g':'')+'">'+(i+1)+'</div><div class="t"><div>'+x.h+':00 – '+x.h+':59 Uhr</div><small>'+x.n+' Videos</small></div><b>'+cmp(x.v)+'</b></div>'}).join(''):'<div class="empty">Noch zu wenig Daten (mind. 2 Videos pro Stunde).</div>')+'</div>'+
-      '<div class="sec">Verlauf</div><div class="card"><div class="k">Follower</div><div style="margin-top:6px">'+spark(hist.map(function(x){return x.follower}),80)+'</div></div>'+
-      '<div class="card"><div class="k">Views gesamt</div><div style="margin-top:6px">'+spark(hist.map(function(x){return x.views}),80)+'</div></div>';
+      '<div class="sec">Verlauf</div><div class="card"><div class="k">Follower</div><div style="margin-top:6px">'+spark(hist.filter(function(x){return x.t>=cutoff()}).map(function(x){return x.follower}),80)+'</div></div>'+
+      '<div class="card"><div class="k">Views gesamt</div><div style="margin-top:6px">'+spark(hist.filter(function(x){return x.t>=cutoff()}).map(function(x){return x.views}),80)+'</div></div>';
   }
   if(tab==='inc'){
     var tp=ls('ct_tax',0),months=[];
