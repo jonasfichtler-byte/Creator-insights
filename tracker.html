@@ -41,6 +41,21 @@ function esc(s){var d=document.createElement('div');d.textContent=s==null?'':s;r
 function lsLoad(){try{return JSON.parse(localStorage.getItem(LS)||'[]')}catch(e){return[]}}
 function lsSave(){try{localStorage.setItem(LS,JSON.stringify(items))}catch(e){}}
 function taxPct(){try{return +localStorage.getItem('ct_tax')||0}catch(e){return 0}}
+function goal(){try{return +localStorage.getItem('ct_goal')||0}catch(e){return 0}}
+function setGoal(v){try{localStorage.setItem('ct_goal',v)}catch(e){}render()}
+function goalCard(){
+  var g=goal(),f=live?live.follower:null,h='<div class="card"><div class="k">Follower-Ziel</div>';
+  if(!g||f===null)return h+'<label>Ziel (z. B. 20000)</label><input type="number" inputmode="numeric" placeholder="20000" onchange="setGoal(this.value)"></div>';
+  var p=Math.min(100,f/g*100),rest=Math.max(0,g-f);
+  h+='<div class="v">'+num(f)+' / '+num(g)+'</div><div style="height:10px;background:var(--bd);border-radius:6px;margin:8px 0;overflow:hidden"><div style="height:100%;width:'+p.toFixed(1)+'%;background:var(--ac)"></div></div>'+
+     '<div class="k">'+p.toFixed(1)+' % · noch '+num(rest)+'</div>';
+  if(rest===0)h+='<div class="k pos">Ziel erreicht! 🎉</div>';
+  else if(hist.length>1){
+    var a=hist[0],b=hist[hist.length-1],days=(b.t-a.t)/864e5,rate=days>0.2?(b.follower-a.follower)/days:0;
+    h+=rate>0?'<div class="k">Ø +'+num(rate)+' pro Tag → ca. '+new Date(Date.now()+rest/rate*864e5).toLocaleDateString('de-DE')+' erreicht</div>':'<div class="k">Prognose folgt, sobald genug Verlauf da ist.</div>';
+  } else h+='<div class="k">Prognose folgt, sobald genug Verlauf da ist.</div>';
+  return h+'<label style="margin-top:8px">Ziel ändern</label><input type="number" inputmode="numeric" value="'+g+'" onchange="setGoal(this.value)"></div>';
+}
 function setTax(v){try{localStorage.setItem('ct_tax',v)}catch(e){}render()}
 
 async function loadLive(){
@@ -108,7 +123,7 @@ function render(){
        '<div class="card"><div class="k">Gesamt</div><div class="v">'+eur(tot)+'</div></div>'+
        '<div class="card"><div class="k">Follower</div><div class="v">'+(last?num(last.fol):'–')+'</div>'+(dl!==null?'<div class="k '+(dl>=0?'pos':'neg')+'">'+(dl>=0?'+':'')+num(dl)+' seit ca. 24 Std.</div>':'')+'</div>'+
        '<div class="card"><div class="k">Views gesamt</div><div class="v">'+(last?num(last.vw):'–')+'</div></div></div>'+
-       '<div class="card"><div class="k">Einnahmen pro Monat (€)</div>'+bars(months)+'</div>'+
+       goalCard()+'<div class="card"><div class="k">Einnahmen pro Monat (€)</div>'+bars(months)+'</div>'+
        '<p class="note">'+(live?'Live von TikTok · '+new Date(live.t).toLocaleTimeString('de-DE'):'Live-Daten: '+(liveErr||'lädt…'))+'</p>';
   }
   if(tab==='inc'){
