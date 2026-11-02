@@ -58,6 +58,15 @@ nav button span{font-size:21px;line-height:1;filter:grayscale(1);opacity:.7}
 nav button.on{color:var(--ac)}nav button.on span{filter:none;opacity:1}
 .fade{animation:f .3s}@keyframes f{from{opacity:0;transform:translateY(6px)}}
 #foot{text-align:center;color:var(--mu);font-size:12px;margin-top:16px}
+.sheetbg{position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:20;display:flex;align-items:flex-end;justify-content:center;animation:f .2s}
+.sheet{background:var(--card);width:100%;max-width:520px;border-radius:24px 24px 0 0;padding:18px 18px calc(24px + env(safe-area-inset-bottom,0px));max-height:88vh;overflow:auto}
+.hm{display:grid;grid-template-columns:34px repeat(6,1fr);gap:4px;align-items:center}
+.hm i{font-style:normal;font-size:11px;color:var(--mu);text-align:center}
+.hm b{display:flex;align-items:center;justify-content:center;height:34px;border-radius:8px;font-size:10px;font-weight:700;color:#fff}
+.hm b.e{background:var(--card2)}
+.cmpbar{height:8px;background:var(--card2);border-radius:6px;position:relative;margin:8px 0 4px}
+.cmpbar i{position:absolute;top:-3px;width:3px;height:14px;background:var(--tx);border-radius:2px}
+.cmpbar u{position:absolute;left:0;top:0;bottom:0;border-radius:6px;background:linear-gradient(90deg,var(--ac2),var(--ac));text-decoration:none}
 </style></head><body><main>
 <header><h1>📈 Creator Tracker</h1><div class="live" id="live" onclick="loadLive()"><i class="dot" id="dot"></i><span id="lt">lädt…</span></div></header>
 <div id="app" class="fade"></div>
@@ -140,6 +149,36 @@ function incData(){
   return {inc:inc,month:inc.filter(function(i){return i.date.slice(0,7)===ym}).reduce(function(s,i){return s+i.amt},0),tot:inc.reduce(function(s,i){return s+i.amt},0),now:now};
 }
 
+var sel=null;
+function openV(id){sel=id;render()}
+function closeV(){sel=null;render()}
+function median(a){a=a.slice().sort(function(x,y){return x-y});var m=a.length>>1;return a.length?(a.length%2?a[m]:(a[m-1]+a[m])/2):0}
+function sheetHTML(){
+  if(!sel||!live)return '';
+  var L=live.list,v=L.filter(function(x){return x.id===sel})[0];if(!v)return '';
+  var med=median(L.map(function(x){return x.views})),avg=L.reduce(function(s,x){return s+x.views},0)/L.length,
+      er=v.views?v.likes/v.views*100:0,aer=L.reduce(function(s,x){return s+(x.views?x.likes/x.views:0)},0)/L.length*100,
+      x=med?v.views/med:0,rank=L.filter(function(y){return y.views>v.views}).length+1,mx=Math.max.apply(null,L.map(function(y){return y.views})),
+      verdict=x>=2?['🔥 Hit',''] :x>=1.1?['👍 Über Schnitt',''] :x>=0.8?['😐 Normal','neg0']:['📉 Unter Schnitt','neg'];
+  return '<div class="sheetbg" onclick="closeV()"><div class="sheet" onclick="event.stopPropagation()">'+
+   '<div style="display:flex;gap:14px">'+img(v.cover,'big')+'<div style="min-width:0"><span class="chip '+verdict[1]+'">'+verdict[0]+'</span><div style="margin:8px 0 4px;font-weight:600">'+esc(v.title||'(ohne Titel)')+'</div><div class="sub">'+(v.created?new Date(ms(v.created)).toLocaleDateString('de-DE',{weekday:'short',day:'numeric',month:'short',year:'numeric'})+' · '+new Date(ms(v.created)).toLocaleTimeString('de-DE',{hour:'2-digit',minute:'2-digit'})+' Uhr':'')+'</div></div></div>'+
+   '<div class="grid3" style="margin:16px 0 8px"><div class="card"><div class="k">Views</div><div class="v">'+num(v.views)+'</div></div><div class="card"><div class="k">Likes</div><div class="v">'+num(v.likes)+'</div></div><div class="card"><div class="k">Rang</div><div class="v">#'+rank+'</div></div></div>'+
+   '<div class="card" style="margin-bottom:10px"><div class="k">Views im Vergleich</div><div style="margin-top:6px"><span class="v">'+x.toFixed(1).replace('.',',')+'×</span> <span class="sub">dein Median ('+num(med)+')</span></div>'+
+   '<div class="cmpbar"><u style="width:'+Math.max(2,v.views/mx*100)+'%"></u><i style="left:'+(med/mx*100)+'%"></i></div><div class="sub">Strich = Median · Ø '+num(avg)+' · Bestes Video '+num(mx)+'</div></div>'+
+   '<div class="card" style="margin-bottom:10px"><div class="k">Likes pro View</div><div style="margin-top:6px"><span class="v">'+er.toFixed(1).replace('.',',')+' %</span> <span class="sub">dein Ø '+aer.toFixed(1).replace('.',',')+' %</span></div><div class="sub">'+(er>aer*1.1?'Das Video kommt besser an als sonst.':er<aer*0.9?'Weniger Likes als sonst im Verhältnis zu den Views.':'So wie sonst auch.')+'</div></div>'+
+   '<button class="btn ghost" onclick="closeV()">Schließen</button></div></div>';
+}
+function heatmap(S){
+  var B=[[0,4],[4,8],[8,12],[12,16],[16,20],[20,24]],DN=['Mo','Di','Mi','Do','Fr','Sa','So'],ord=[1,2,3,4,5,6,0],cell={},mx=0;
+  S.L.forEach(function(v){var d=new Date(ms(v.created)),w=d.getDay(),b=Math.floor(d.getHours()/4),k=w+'_'+b;cell[k]=cell[k]||{s:0,n:0};cell[k].s+=v.views;cell[k].n++});
+  Object.keys(cell).forEach(function(k){cell[k].a=cell[k].s/cell[k].n;if(cell[k].n>=2&&cell[k].a>mx)mx=cell[k].a});
+  var h='<div class="hm"><i></i>'+B.map(function(b){return '<i>'+b[0]+'–'+b[1]+'</i>'}).join('');
+  ord.forEach(function(w,r){h+='<i style="text-align:left">'+DN[r]+'</i>';
+    for(var b=0;b<6;b++){var c=cell[w+'_'+b];
+      if(!c)h+='<b class="e"></b>';
+      else{var q=mx?Math.min(1,c.a/mx):0,al=c.n>=2?(.25+.75*q):.12;h+='<b style="background:rgba(254,44,85,'+al.toFixed(2)+');'+(c.n<2?'color:var(--mu)':'')+'">'+cmp(c.a)+'</b>'}}});
+  return h+'</div><div class="sub" style="margin-top:10px">Ø Views pro Video. Dunkler = besser. Blasse Felder: nur 1 Video, wenig Aussagekraft. Uhrzeiten in Blöcken von 4 Stunden.</div>';
+}
 function render(){
   var N=[['home','🏠','Start'],['vid','🎬','Videos'],['ins','💡','Insights'],['inc','💶','Geld']];
   document.getElementById('nav').innerHTML=N.map(function(t){return '<button class="'+(tab===t[0]?'on':'')+'" onclick="go(\''+t[0]+'\')"><span>'+t[1]+'</span>'+t[2]+'</button>'}).join('');
@@ -164,7 +203,7 @@ function render(){
     if(sort==='top')L.sort(function(a,b){return b.views-a.views});else L.sort(function(a,b){return ms(b.created)-ms(a.created)});
     L=L.slice(0,30);var mx=Math.max.apply(null,L.map(function(v){return v.views}).concat([1]));
     h+='<div class="pills"><button class="'+(sort==='top'?'on':'')+'" onclick="sort=\'top\';render()">🔥 Top</button><button class="'+(sort==='new'?'on':'')+'" onclick="sort=\'new\';render()">🕒 Neueste</button></div>'+
-      '<div class="card">'+(L.length?L.map(function(v,i){return '<div class="row"><div class="rank '+(i<3&&sort==='top'?'g':'')+'">'+(i+1)+'</div>'+img(v.cover)+'<div class="t"><div>'+esc(v.title||'(ohne Titel)')+'</div><small>'+num(v.likes)+' Likes'+(v.created?' · '+new Date(ms(v.created)).toLocaleDateString('de-DE'):'')+'</small><div class="vbar" style="width:'+Math.max(3,v.views/mx*100)+'%"></div></div><b>'+cmp(v.views)+'</b></div>'}).join(''):'<div class="empty">'+(liveErr?esc(liveErr):'Lädt…')+'</div>')+'</div>';
+      '<div class="sub" style="margin:0 4px 8px">Tippe ein Video für den Check.</div><div class="card">'+(L.length?L.map(function(v,i){return '<div class="row" style="cursor:pointer" onclick="openV(\''+v.id+'\')"><div class="rank '+(i<3&&sort==='top'?'g':'')+'">'+(i+1)+'</div>'+img(v.cover)+'<div class="t"><div>'+esc(v.title||'(ohne Titel)')+'</div><small>'+num(v.likes)+' Likes'+(v.created?' · '+new Date(ms(v.created)).toLocaleDateString('de-DE'):'')+'</small><div class="vbar" style="width:'+Math.max(3,v.views/mx*100)+'%"></div></div><b>'+cmp(v.views)+'</b></div>'}).join(''):'<div class="empty">'+(liveErr?esc(liveErr):'Lädt…')+'</div>')+'</div>';
   }
   if(tab==='ins'){
     var DN=['So','Mo','Di','Mi','Do','Fr','Sa'],ord=[1,2,3,4,5,6,0],avg=ord.map(function(w){return {l:DN[w],v:S.dc[w]?S.dv[w]/S.dc[w]:0,n:S.dc[w],t:S.dc[w]?cmp(S.dv[w]/S.dc[w]):''}}),
@@ -172,7 +211,7 @@ function render(){
     var hs=Object.keys(S.hc).filter(function(k){return S.hc[k]>=2}).map(function(k){return {h:+k,v:S.hv[k]/S.hc[k],n:S.hc[k]}}).sort(function(a,b){return b.v-a.v}).slice(0,3);
     h+='<div class="sec">Wann posten?</div><div class="card"><div class="k">Ø Views pro Video je Wochentag</div><div style="margin-top:8px">'+bars(avg,bi<0?null:bi)+'</div>'+
       (bi>=0?'<div class="sub">Bester Tag: <b style="color:var(--tx)">'+avg[bi].l+'</b> (nur Tage mit mind. 2 Videos)</div>':'')+'</div>'+
-      '<div class="card"><div class="k">Beste Uhrzeiten</div>'+(hs.length?hs.map(function(x,i){return '<div class="row"><div class="rank '+(i===0?'g':'')+'">'+(i+1)+'</div><div class="t"><div>'+x.h+':00 – '+x.h+':59 Uhr</div><small>'+x.n+' Videos</small></div><b>'+cmp(x.v)+'</b></div>'}).join(''):'<div class="empty">Noch zu wenig Daten (mind. 2 Videos pro Stunde).</div>')+'</div>'+
+      '<div class="card"><div class="k">🗓️ Heatmap: Wochentag × Uhrzeit</div><div style="margin-top:10px">'+heatmap(S)+'</div></div><div class="card"><div class="k">Beste Uhrzeiten</div>'+(hs.length?hs.map(function(x,i){return '<div class="row"><div class="rank '+(i===0?'g':'')+'">'+(i+1)+'</div><div class="t"><div>'+x.h+':00 – '+x.h+':59 Uhr</div><small>'+x.n+' Videos</small></div><b>'+cmp(x.v)+'</b></div>'}).join(''):'<div class="empty">Noch zu wenig Daten (mind. 2 Videos pro Stunde).</div>')+'</div>'+
       '<div class="sec">Verlauf</div><div class="card"><div class="k">Follower</div><div style="margin-top:6px">'+spark(hist.map(function(x){return x.follower}),80)+'</div></div>'+
       '<div class="card"><div class="k">Views gesamt</div><div style="margin-top:6px">'+spark(hist.map(function(x){return x.views}),80)+'</div></div>';
   }
@@ -190,7 +229,7 @@ function render(){
         (tp?'<div class="sub" style="margin-top:8px">Zurücklegen: <b style="color:var(--tx)">'+eur(D.tot*tp/100)+'</b> · Übrig: '+eur(D.tot*(1-tp/100))+'</div>':'')+'</div>'+
       '<div class="sec">Verlauf</div><div class="card">'+(D.inc.length?D.inc.map(function(i){return '<div class="row"><div class="t"><div><b>'+eur(i.amt)+'</b></div><small>'+esc(i.src)+' · '+new Date(i.date).toLocaleDateString('de-DE')+(i.note?' · '+esc(i.note):'')+'</small></div><button class="x" onclick="del(\''+i.id+'\')">✕</button></div>'}).join(''):'<div class="empty">Noch keine Einnahmen.</div>')+'</div>';
   }
-  var app=document.getElementById('app');app.innerHTML=h;
+  var app=document.getElementById('app');app.innerHTML=h+sheetHTML();
 }
 function addInc(){
   var a=parseFloat(document.getElementById('amt').value.replace(',','.'));if(!(a>0))return;
