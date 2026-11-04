@@ -94,7 +94,8 @@ var API='https://creator-tracker-api.jonas-fichtler.workers.dev',tab='home',live
 var eur=function(n){return n.toLocaleString('de-DE',{style:'currency',currency:'EUR'})};
 var num=function(n){return Math.round(n).toLocaleString('de-DE')};
 var cmp=function(n){n=+n||0;if(n>=1e6)return (n/1e6).toFixed(n>=1e7?1:2).replace('.',',')+'M';if(n>=1e4)return (n/1e3).toFixed(1).replace('.',',')+'K';return num(n)};
-var today=function(){return new Date().toISOString().slice(0,10)};
+var ym2=function(d){return d.getFullYear()+'-'+('0'+(d.getMonth()+1)).slice(-2)};
+var today=function(){var d=new Date();return ym2(d)+'-'+('0'+d.getDate()).slice(-2)};
 function img(u,c){return u?'<img class="th '+(c||'')+'" src="'+esc(u)+'" referrerpolicy="no-referrer" loading="lazy" onerror="this.style.display=\'none\'">':''}
 function esc(s){var d=document.createElement('div');d.textContent=s==null?'':s;return d.innerHTML}
 function ms(c){c=+c||0;return c<1e12?c*1000:c}
@@ -108,8 +109,8 @@ async function loadLive(){
   document.getElementById('lt').textContent='aktualisiere…';
   try{
     var r=await fetch(API+'/api/stats'),j=await r.json();
-    if(j.error)throw new Error(j.error);live=j;liveErr='';
-    try{hist=await (await fetch(API+'/api/history')).json()}catch(e){}
+    if(j.error)throw new Error(j.error);if(typeof j.follower!=='number'||!Array.isArray(j.list))throw new Error('Ungültige Antwort');live=j;liveErr='';
+    try{var hh=await (await fetch(API+'/api/history')).json();if(Array.isArray(hh))hist=hh}catch(e){}
   }catch(e){liveErr=String(e.message||e).slice(0,100)}
   render();
 }
@@ -174,7 +175,7 @@ function bestVideoHTML(S){
 }
 
 function incData(){
-  var inc=items.filter(function(i){return i.t==='inc'}).sort(function(a,b){return a.date<b.date?1:-1}),now=new Date(),ym=now.toISOString().slice(0,7);
+  var inc=items.filter(function(i){return i.t==='inc'}).sort(function(a,b){return a.date<b.date?1:-1}),now=new Date(),ym=ym2(now);
   return {inc:inc,month:inc.filter(function(i){return i.date.slice(0,7)===ym}).reduce(function(s,i){return s+i.amt},0),tot:inc.reduce(function(s,i){return s+i.amt},0),now:now};
 }
 
@@ -282,24 +283,36 @@ function render(){
   if(tab==='idea')h+=ideasHTML();
   if(tab==='inc'){
     var tp=ls('ct_tax',0),months=[];
-    for(var k=5;k>=0;k--){var d=new Date(D.now.getFullYear(),D.now.getMonth()-k,1),key=d.toISOString().slice(0,7),v=D.inc.filter(function(i){return i.date.slice(0,7)===key}).reduce(function(s,i){return s+i.amt},0);months.push({l:d.toLocaleDateString('de-DE',{month:'short'}),v:v,t:v?Math.round(v):''})}
+    for(var k=5;k>=0;k--){var d=new Date(D.now.getFullYear(),D.now.getMonth()-k,1),key=ym2(d),v=D.inc.filter(function(i){return i.date.slice(0,7)===key}).reduce(function(s,i){return s+i.amt},0);months.push({l:d.toLocaleDateString('de-DE',{month:'short'}),v:v,t:v?Math.round(v):''})}
     var per=live&&live.views&&D.tot?D.tot/live.views*1000:null;
     h+='<div class="card hero"><div class="k">Diesen Monat</div><div class="big">'+eur(D.month)+'</div><div class="sub">Gesamt '+eur(D.tot)+(per!==null?' · '+eur(per)+' pro 1.000 Views':'')+'</div></div>'+
       '<div class="card"><div class="k">Pro Monat</div><div style="margin-top:8px">'+bars(months)+'</div></div>'+
-      (showForm?'<div class="card"><div class="k">Neue Einnahme</div><label>Betrag in €</label><input id="amt" inputmode="decimal" placeholder="z. B. 42,50">'+
-        '<div class="grid2" style="margin:0"><div><label>Datum</label><input id="dt" type="date" value="'+today()+'"></div><div><label>Quelle</label><select id="src"><option>Creator Rewards</option><option>Live-Geschenke</option><option>Sponsoring</option><option>Affiliate</option><option>Sonstiges</option></select></div></div>'+
+      (showForm?'<div class="card"><div class="k">Neue Einnahme</div><div class="grid2" style="margin:0"><div><label>Betrag</label><input id="amt" inputmode="decimal" placeholder="z. B. 42,50"></div><div><label>Währung</label><select id="cur" onchange="curChange()"><option value="USD">$ USD (TikTok)</option><option value="EUR">€ Euro</option></select></div></div>'+
+        '<div id="rtbox"><label>Kurs 1 $ in € <span id="rtinfo" style="font-weight:500"></span></label><input id="rt" inputmode="decimal"></div>'+
+        '<div class="grid2" style="margin:0"><div><label>Datum</label><input id="dt" type="date" value="'+today()+'" onchange="fetchRate()"></div><div><label>Quelle</label><select id="src"><option>Creator Rewards</option><option>Live-Geschenke</option><option>Sponsoring</option><option>Affiliate</option><option>Sonstiges</option></select></div></div>'+
         '<label>Notiz (optional)</label><input id="nt"><button class="btn" onclick="addInc()">Speichern</button><button class="btn ghost" onclick="showForm=false;render()">Abbrechen</button></div>'
        :'<button class="btn" style="margin:0 0 12px" onclick="showForm=true;render()">+ Einnahme eintragen</button>')+
       '<div class="card"><div class="k">🧾 Steuerrücklage</div><label>Prozent</label><input type="number" min="0" max="60" value="'+tp+'" onchange="lsSet(\'ct_tax\',+this.value);render()">'+
         (tp?'<div class="sub" style="margin-top:8px">Zurücklegen: <b style="color:var(--tx)">'+eur(D.tot*tp/100)+'</b> · Übrig: '+eur(D.tot*(1-tp/100))+'</div>':'')+'</div>'+
-      '<div class="sec">Verlauf</div><div class="card">'+(D.inc.length?D.inc.map(function(i){return '<div class="row"><div class="t"><div><b>'+eur(i.amt)+'</b></div><small>'+esc(i.src)+' · '+new Date(i.date).toLocaleDateString('de-DE')+(i.note?' · '+esc(i.note):'')+'</small></div><button class="x" onclick="del(\''+i.id+'\')">✕</button></div>'}).join(''):'<div class="empty">Noch keine Einnahmen.</div>')+'</div>';
+      '<div class="sec">Verlauf</div><div class="card">'+(D.inc.length?D.inc.map(function(i){return '<div class="row"><div class="t"><div><b>'+eur(i.amt)+'</b>'+(i.usd?' <span class="sub">($'+i.usd.toLocaleString('de-DE',{minimumFractionDigits:2})+' · Kurs '+String(i.rate).replace('.',',')+')</span>':'')+'</div><small>'+esc(i.src)+' · '+new Date(i.date).toLocaleDateString('de-DE')+(i.note?' · '+esc(i.note):'')+'</small></div><button class="x" onclick="del(\''+i.id+'\')">✕</button></div>'}).join(''):'<div class="empty">Noch keine Einnahmen.</div>')+'</div>';
   }
   var app=document.getElementById('app');app.innerHTML=h+sheetHTML();
+  if(tab==='inc'&&showForm){var cs=document.getElementById('cur');if(cs){cs.value=ls('ct_cur','USD');curChange()}}
+}
+function curChange(){var c=document.getElementById('cur').value;lsSet('ct_cur',c);document.getElementById('rtbox').style.display=c==='USD'?'block':'none';if(c==='USD')fetchRate()}
+async function fetchRate(){
+  var rt=document.getElementById('rt'),info=document.getElementById('rtinfo'),d=(document.getElementById('dt')||{}).value||today();if(!rt)return;
+  rt.value=String(ls('ct_rate',0.86)).replace('.',',');info.textContent='(lädt…)';
+  try{var r=await fetch('https://api.frankfurter.dev/v1/'+d+'?base=USD&symbols=EUR'),j=await r.json(),v=j.rates.EUR;
+    if(!(v>0))throw 0;rt.value=String(v).replace('.',',');lsSet('ct_rate',v);info.textContent='(Kurs vom '+new Date(j.date).toLocaleDateString('de-DE')+')'}
+  catch(e){info.textContent='(nicht geladen, bitte prüfen!)'}
 }
 function addInc(){
   var a=parseFloat(document.getElementById('amt').value.replace(',','.'));if(!(a>0))return;
-  items.push({id:'e'+Date.now(),t:'inc',date:document.getElementById('dt').value||today(),amt:a,src:document.getElementById('src').value,note:document.getElementById('nt').value});
-  save();showForm=false;render();
+  var o={id:'e'+Date.now(),t:'inc',date:document.getElementById('dt').value||today(),amt:a,src:document.getElementById('src').value,note:document.getElementById('nt').value};
+  if(document.getElementById('cur').value==='USD'){var rate=parseFloat(document.getElementById('rt').value.replace(',','.'));if(!(rate>0)){alert('Bitte einen Kurs eintragen');return}
+    o.usd=a;o.rate=rate;o.amt=Math.round(a*rate*100)/100}
+  items.push(o);save();showForm=false;render();
 }
 function del(id){items=items.filter(function(i){return i.id!==id});save();render()}
 render();loadLive();
