@@ -230,17 +230,35 @@ function rangeCard(){
 }
 var ideas=ls('ct_ideas',[]),istat='idea',ST=[['idea','💡','Ideen'],['shot','🎬','Gedreht'],['posted','✅','Gepostet']];
 function saveIdeas(){lsSet('ct_ideas',ideas)}
-function addIdea(){var t=document.getElementById('it').value.trim();if(!t)return;ideas.unshift({id:'i'+Date.now(),t:t,n:document.getElementById('in').value.trim(),s:'idea',d:Date.now()});saveIdeas();istat='idea';render()}
+function addIdea(){var t=document.getElementById('it').value.trim();if(!t)return;var at=document.getElementById('iat').value;ideas.unshift({id:'i'+Date.now(),t:t,n:document.getElementById('in').value.trim(),s:'idea',d:Date.now(),at:at?new Date(at).getTime():0});saveIdeas();istat='idea';render()}
 function moveIdea(id,s){ideas.forEach(function(i){if(i.id===id)i.s=s});saveIdeas();render()}
 function delIdea(id){if(!confirm('Löschen?'))return;ideas=ideas.filter(function(i){return i.id!==id});saveIdeas();render()}
+function setIdeaTime(id,v){ideas.forEach(function(i){if(i.id===id)i.at=v?new Date(v).getTime():0});saveIdeas();render()}
+function toLocalInput(ms){if(!ms)return '';var d=new Date(ms),p=function(n){return ('0'+n).slice(-2)};return d.getFullYear()+'-'+p(d.getMonth()+1)+'-'+p(d.getDate())+'T'+p(d.getHours())+':'+p(d.getMinutes())}
+function fmtAt(ms){return new Date(ms).toLocaleString('de-DE',{weekday:'short',day:'numeric',month:'short',hour:'2-digit',minute:'2-digit'})+' Uhr'}
+function dueChip(i){if(!i.at||i.s==='posted')return '';var diff=i.at-Date.now();
+  if(diff<0)return '<span class="chip neg">⏰ überfällig · '+fmtAt(i.at)+'</span>';
+  if(diff<864e5)return '<span class="chip" style="background:rgba(254,44,85,.15);color:var(--ac)">🔔 bald · '+fmtAt(i.at)+'</span>';
+  return '<span class="chip" style="background:var(--card2);color:var(--mu)">🕒 '+fmtAt(i.at)+'</span>'}
+function icsIdea(id){var i=ideas.filter(function(x){return x.id===id})[0];if(!i||!i.at)return;
+  var f=function(ms){var d=new Date(ms),p=function(n){return ('0'+n).slice(-2)};return d.getFullYear()+p(d.getMonth()+1)+p(d.getDate())+'T'+p(d.getHours())+p(d.getMinutes())+'00'},
+  esc2=function(t){return String(t).replace(/[\\,;]/g,function(c){return '\\'+c}).replace(/\n/g,'\\n')};
+  var ics=['BEGIN:VCALENDAR','VERSION:2.0','PRODID:-//Creator Tracker//DE','BEGIN:VEVENT','UID:'+i.id+'@creator-tracker','DTSTAMP:'+f(Date.now()),'DTSTART:'+f(i.at),'DTEND:'+f(i.at+30*60000),
+    'SUMMARY:'+esc2('🎬 Posten: '+i.t),'DESCRIPTION:'+esc2(i.n||'Video in TikTok Studio planen oder posten'),
+    'BEGIN:VALARM','ACTION:DISPLAY','DESCRIPTION:'+esc2('Gleich posten: '+i.t),'TRIGGER:-PT30M','END:VALARM',
+    'BEGIN:VALARM','ACTION:DISPLAY','DESCRIPTION:'+esc2('Jetzt posten: '+i.t),'TRIGGER:PT0M','END:VALARM','END:VEVENT','END:VCALENDAR'].join('\r\n');
+  location.href='data:text/calendar;charset=utf-8,'+encodeURIComponent(ics)}
+function nextPostsHTML(){
+  var L=ideas.filter(function(i){return i.at&&i.s!=='posted'}).sort(function(a,b){return a.at-b.at}).slice(0,3);if(!L.length)return '';
+  return '<div class="card"><div class="k">🗓️ Als Nächstes posten</div>'+L.map(function(i){return '<div class="row"><div class="t"><div>'+esc(i.t)+'</div><small>'+(i.s==='shot'?'🎬 gedreht':'💡 Idee')+'</small></div>'+dueChip(i)+'</div>'}).join('')+'</div>'}
 function ideasHTML(){
-  var h='<div class="card"><div class="k">Neue Idee</div><label>Titel / Hook</label><input id="it" placeholder="z. B. Was wäre wenn Monster 1 Woche nur Wasser…"><label>Notiz (optional)</label><textarea id="in" placeholder="Ablauf, Hashtags, Sound…"></textarea><button class="btn" onclick="addIdea()">+ Idee speichern</button></div>';
+  var h='<div class="card"><div class="k">Neue Idee</div><label>Titel / Hook</label><input id="it" placeholder="z. B. Was wäre wenn Monster 1 Woche nur Wasser…"><label>Notiz (optional)</label><textarea id="in" placeholder="Ablauf, Hashtags, Sound…"></textarea><label>Geplant für (optional)</label><input id="iat" type="datetime-local"><button class="btn" onclick="addIdea()">+ Idee speichern</button></div>';
   h+='<div class="pills">'+ST.map(function(x){var n=ideas.filter(function(i){return i.s===x[0]}).length;return '<button class="'+(istat===x[0]?'on':'')+'" onclick="istat=\''+x[0]+'\';render()">'+x[1]+' '+x[2]+' '+n+'</button>'}).join('')+'</div>';
-  var L=ideas.filter(function(i){return i.s===istat});
+  var L=ideas.filter(function(i){return i.s===istat}).sort(function(a,b){return (a.at||9e15)-(b.at||9e15)});
   h+='<div class="card">'+(L.length?L.map(function(i){
     var nx=istat==='idea'?['shot','🎬 Gedreht']:istat==='shot'?['posted','✅ Gepostet']:null,pv=istat==='posted'?['shot','↩︎ Zurück']:istat==='shot'?['idea','↩︎ Idee']:null;
     return '<div class="idea"><div style="font-weight:600">'+esc(i.t)+'</div>'+(i.n?'<div class="sub" style="white-space:pre-wrap;margin-top:2px">'+esc(i.n)+'</div>':'')+
-      '<div class="sub" style="margin-top:4px">'+new Date(i.d).toLocaleDateString('de-DE')+'</div><div class="acts">'+(nx?'<button class="go" onclick="moveIdea(\''+i.id+'\',\''+nx[0]+'\')">'+nx[1]+'</button>':'')+(pv?'<button onclick="moveIdea(\''+i.id+'\',\''+pv[0]+'\')">'+pv[1]+'</button>':'')+'<button style="flex:0 0 44px" onclick="delIdea(\''+i.id+'\')">🗑</button></div></div>'}).join(''):'<div class="empty">'+(istat==='idea'?'Noch keine Ideen. Schreib die erste auf!':'Hier ist noch nichts.')+'</div>')+'</div>';
+      '<div style="margin-top:6px">'+dueChip(i)+'</div><label style="margin-top:8px">Geplant für</label><input type="datetime-local" value="'+toLocalInput(i.at)+'" onchange="setIdeaTime(\''+i.id+'\',this.value)"><div class="acts">'+(i.at&&istat!=='posted'?'<button onclick="icsIdea(\''+i.id+'\')">📅 Erinnerung</button>':'')+(nx?'<button class="go" onclick="moveIdea(\''+i.id+'\',\''+nx[0]+'\')">'+nx[1]+'</button>':'')+(pv?'<button onclick="moveIdea(\''+i.id+'\',\''+pv[0]+'\')">'+pv[1]+'</button>':'')+'<button style="flex:0 0 44px" onclick="delIdea(\''+i.id+'\')">🗑</button></div></div>'}).join(''):'<div class="empty">'+(istat==='idea'?'Noch keine Ideen. Schreib die erste auf!':'Hier ist noch nichts.')+'</div>')+'</div>';
   return h;
 }
 function render(){
@@ -259,7 +277,7 @@ function render(){
       '<div class="grid3"><div class="card"><div class="k">Views</div><div class="v">'+(live?cmp(live.views):'–')+'</div></div>'+
       '<div class="card"><div class="k">Likes</div><div class="v">'+(live?cmp(live.likes):'–')+'</div></div>'+
       '<div class="card"><div class="k">Videos</div><div class="v">'+(live?num(live.videos):'–')+'</div></div></div>'+
-      pillsHTML()+rangeCard()+goalHTML()+
+      pillsHTML()+rangeCard()+nextPostsHTML()+goalHTML()+
       '<div class="grid2"><div class="card"><div class="k">Dieser Monat</div><div class="v">'+eur(D.month)+'</div></div>'+
       '<div class="card"><div class="k">Gesamt</div><div class="v">'+eur(D.tot)+'</div></div></div>'+bestVideoHTML(S);
   }
